@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { prepareForUpload, RAW_INPUT_MAX_BYTES } from "@/lib/client/compress";
 import { getSessionId, pushRecent } from "@/lib/client/session";
 import type { ResultResponse } from "@/lib/types";
 
 const ACCEPT = ["image/png", "image/jpeg", "image/webp"];
-const MAX_BYTES = 8 * 1024 * 1024;
 
 type Phase = "idle" | "uploading" | "analyzing" | "done";
 
@@ -17,6 +17,7 @@ export function ImageDropzone() {
   const [dragging, setDragging] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
   const accept = useCallback((f: File | null | undefined) => {
@@ -26,8 +27,8 @@ export function ImageDropzone() {
       setError("PNG / JPEG / WebP の画像を選んでください（SVG・PDFは非対応）");
       return;
     }
-    if (f.size > MAX_BYTES) {
-      setError("画像は 8MB 以下にしてください");
+    if (f.size > RAW_INPUT_MAX_BYTES) {
+      setError("画像は 30MB 以下にしてください（アップロード前に自動で縮小します）");
       return;
     }
     setFile(f);
@@ -74,11 +75,17 @@ export function ImageDropzone() {
     if (!file) return;
     setError(null);
     setPhase("uploading");
-    const form = new FormData();
-    form.append("image", file, file.name);
-    const session = getSessionId();
-    if (session) form.append("session", session);
+    setNote(null);
     try {
+      // Vercel rejects bodies over 4.5 MB; shrink large images client-side first.
+      const prepared = await prepareForUpload(file);
+      if (prepared.changed) {
+        setNote(`大きな画像のため ${prepared.width}×${prepared.height}・${(prepared.file.size / 1024 / 1024).toFixed(1)} MB に縮小して送信しました`);
+      }
+      const form = new FormData();
+      form.append("image", prepared.file, prepared.file.name);
+      const session = getSessionId();
+      if (session) form.append("session", session);
       setPhase("analyzing");
       const res = await fetch("/api/analyze", { method: "POST", body: form });
       const body = (await res.json().catch(() => ({}))) as Partial<ResultResponse> & { error?: string };
@@ -145,7 +152,7 @@ export function ImageDropzone() {
               クリックしてファイルを選択、または <kbd className="rounded border border-border px-1">Ctrl</kbd>+
               <kbd className="rounded border border-border px-1">V</kbd> で貼り付け
             </p>
-            <p className="text-xs text-muted">PNG / JPEG / WebP、8MB・4096px 以内</p>
+            <p className="text-xs text-muted">PNG / JPEG / WebP（大きな画像は送信前に自動で縮小します）</p>
           </div>
         )}
       </div>
@@ -167,6 +174,8 @@ export function ImageDropzone() {
           )}
         </p>
       )}
+
+      {note && <p className="text-sm text-muted">{note}</p>}
 
       {error && (
         <p role="alert" className="rounded-lg border border-accent bg-accent-soft px-3 py-2 text-sm text-accent">

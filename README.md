@@ -167,7 +167,7 @@ tests/                  vitest
 
 ### API
 
-`POST /api/analyze` — `multipart/form-data` で `image`（PNG/JPEG/WebP、8MB・4096px 以内）と任意の `session`（匿名 UUID）を送信。
+`POST /api/analyze` — `multipart/form-data` で `image`（PNG/JPEG/WebP、8MB・4096px 以内。Vercel 上では 4.5MB 未満）と任意の `session`（匿名 UUID）を送信。
 結果 JSON（`submission`, `final`, `analyzers`, `judge`, `versions`）を返します。
 
 `GET /api/results/:id` — 上記と同じ形式で保存済み結果を返します。アップロード画像そのものは返しません。
@@ -179,7 +179,8 @@ tests/                  vitest
 
 - ユーザー登録はありません。ブラウザに匿名 UUID を保存し、「このブラウザの最近の解析」の表示にのみ使います
 - 画像はメタデータを除去・再エンコードした上で非公開ストレージに保存されます。公開バケット・公開一覧・画像 URL はありません
-- 受け付ける画像は PNG / JPEG / WebP のみ（SVG・PDF は不可）、8MB・4096×4096px 以内。サーバー側でマジックナンバーを検証します
+- 受け付ける画像は PNG / JPEG / WebP のみ（SVG・PDF は不可）。サーバー側の上限は 8MB・4096×4096px で、マジックナンバーを検証します
+- Vercel の関数リクエスト上限（4.5MB）に収まるよう、ブラウザ側で送信前に最大 2048px・3.5MB 以下へ自動縮小します（サーバーでも 2048px に縮小するため品質面の損失はありません）。`curl` 等から直接 API を叩く場合は 4.5MB 未満の画像を送ってください
 - 匿名アップロードには簡易的なレート制限（既定 10 回 / 10 分 / IP）があります。本番では Vercel WAF 等の併用を推奨します
 
 ## 研究用途について
