@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { RUBRIC_VERSION, rubricAsText } from "@/lib/scoring/rubric";
 
-export const PROMPT_VERSION = process.env.PROMPT_VERSION ?? "kasumigaseki-master-v1";
+export const PROMPT_VERSION = process.env.PROMPT_VERSION ?? "kasumigaseki-master-v1.1";
 
 const PROMPT_DIR = path.join(process.cwd(), "prompts");
 
