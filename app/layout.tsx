@@ -39,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             「曼荼羅」は宗教的価値の評価ではなく、中心・階層・反復・群構造・世界の一枚化といった空間構成の形式的参照モデルです。
             KMIは資料の品質評価ではありません。
           </p>
-          <p className="mt-1">画像は非公開ストレージに保存され、公開の一覧は存在しません。個人情報は収集しません。</p>
+          <p className="mt-1">画像は非公開ストレージに保存され、公開の一覧は存在しません。氏名・メールアドレス等は収集しません（同一ブラウザの履歴表示用に匿名IDのみ保存します）。</p>
         </footer>
       </body>
     </html>

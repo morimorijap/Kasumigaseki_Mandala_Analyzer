@@ -43,6 +43,12 @@ function toModelRun(r: Row): ModelRun {
   };
 }
 
+/** The judge column is NOT NULL; a failed judge is stored as `{}` and read back as null. */
+function nonEmptyJudge(v: unknown): FinalResult["judgeResult"] {
+  if (!v || typeof v !== "object" || Object.keys(v as object).length === 0) return null;
+  return v as FinalResult["judgeResult"];
+}
+
 function toFinalResult(r: Row): FinalResult {
   const extra = (r.dimensions as { __meta?: { dominantStyle?: string } })?.__meta ?? {};
   const dims = { ...(r.dimensions as Record<string, unknown>) };
@@ -59,7 +65,7 @@ function toFinalResult(r: Row): FinalResult {
     dominantStyle: extra.dominantStyle ?? "",
     readability: num(r.readability),
     dimensions: dims as FinalResult["dimensions"],
-    judgeResult: (r.judge_result as FinalResult["judgeResult"]) ?? null,
+    judgeResult: nonEmptyJudge(r.judge_result),
     finalReportMarkdown: String(r.final_report_markdown),
     algorithmVersion: String(r.algorithm_version),
   };
@@ -129,5 +135,16 @@ export class PostgresStore implements Store {
     const sql = getSql();
     const rows = await sql`select * from final_results where submission_id = ${submissionId}::uuid`;
     return rows[0] ? toFinalResult(rows[0]) : null;
+  }
+
+  async deleteSubmission(id: string): Promise<void> {
+    const sql = getSql();
+    await sql`delete from submissions where id = ${id}::uuid`;
+  }
+
+  async countByObjectKey(objectKey: string): Promise<number> {
+    const sql = getSql();
+    const rows = await sql`select count(*)::int as n from submissions where storage_object_key = ${objectKey}`;
+    return Number(rows[0]?.n ?? 0);
   }
 }

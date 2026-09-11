@@ -62,15 +62,18 @@ export default async function ResultPage({ params }: Props) {
         <DimensionEvidence final={data.final} />
       </section>
 
-      <details className="rounded-2xl border border-border bg-card">
-        <summary className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 font-bold">
-          <span className="flex-1">最終統合レポート（Markdown）</span>
+      <section className="rounded-2xl border border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-6 pt-4">
+          <h2 className="font-bold">最終統合レポート（Markdown）</h2>
           <CopyButton text={data.final.finalReportMarkdown} label="Markdownをコピー" />
-        </summary>
-        <div className="border-t border-border px-6 py-4">
-          <ReportMarkdown markdown={data.final.finalReportMarkdown} />
         </div>
-      </details>
+        <details>
+          <summary className="px-6 py-3 text-sm text-muted">レポート全文を表示</summary>
+          <div className="border-t border-border px-6 py-4">
+            <ReportMarkdown markdown={data.final.finalReportMarkdown} />
+          </div>
+        </details>
+      </section>
 
       <section>
         <h2 className="mb-3 font-bold">詳細（研究用）</h2>

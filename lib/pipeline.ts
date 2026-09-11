@@ -9,12 +9,13 @@ import { preprocessImage } from "@/lib/image/preprocess";
 import { runAnalyzer, type AnalyzerOutcome } from "@/lib/llm/analyzer";
 import { ANALYZER_NAMES, analyzerModels, judgeModel } from "@/lib/llm/config";
 import { runJudge } from "@/lib/llm/judge";
+import { makeDeadline } from "@/lib/llm/deadline";
 import { PROMPT_VERSION } from "@/lib/llm/prompts";
 import { RUBRIC_VERSION } from "@/lib/scoring/rubric";
 import { buildReportMarkdown } from "@/lib/scoring/report";
 import { dimensionMedians, synthesize, type NamedAnalyzerResult } from "@/lib/scoring/synthesize";
 import { getStorage, objectKeyFor } from "@/lib/storage";
-import { getStore } from "@/lib/store";
+import { getStore, type Store } from "@/lib/store";
 import type { ResultResponse } from "@/lib/types";
 import { toResultResponse } from "@/lib/results";
 
@@ -36,6 +37,7 @@ export type AnalyzeInput = {
 };
 
 export async function analyzeImage(input: AnalyzeInput): Promise<ResultResponse> {
+  const deadline = makeDeadline();
   const store = getStore();
   const storage = getStorage();
 
@@ -65,11 +67,39 @@ export async function analyzeImage(input: AnalyzeInput): Promise<ResultResponse>
     rubricVersion: RUBRIC_VERSION,
   });
 
+  try {
+    return await runModelsAndScore(submission, img, featuresText, deadline);
+  } catch (err) {
+    // Do not leave half-written rows (and a billed-but-unusable upload) behind.
+    await cleanupSubmission(submission.id, objectKey).catch((e) =>
+      console.error("[analyze] cleanup failed", e instanceof Error ? e.message : e),
+    );
+    throw err;
+  }
+}
+
+async function cleanupSubmission(id: string, objectKey: string): Promise<void> {
+  const store = getStore();
+  const storage = getStorage();
+  await store.deleteSubmission(id);
+  if ((await store.countByObjectKey(objectKey)) === 0) await storage.delete(objectKey);
+}
+
+async function runModelsAndScore(
+  submission: Awaited<ReturnType<Store["insertSubmission"]>>,
+  img: Awaited<ReturnType<typeof preprocessImage>>,
+  featuresText: string,
+  deadline: ReturnType<typeof makeDeadline>,
+): Promise<ResultResponse> {
+  const store = getStore();
+
   // 10–11. analyzers in parallel, every run persisted
   const llmImage = { data: img.forLlm, mime: img.forLlmMime };
   const refs = analyzerModels();
   const analyzerOutcomes: AnalyzerOutcome[] = await Promise.all(
-    refs.map((ref, i) => runAnalyzer(ref, ANALYZER_NAMES[i] ?? `Analyzer ${i + 1}`, llmImage, featuresText)),
+    refs.map((ref, i) =>
+      runAnalyzer(ref, ANALYZER_NAMES[i] ?? `Analyzer ${i + 1}`, llmImage, featuresText, deadline),
+    ),
   );
   // Inserted sequentially so created_at order == analyzer order (A, B, C…),
   // which is how the judge and the result view refer to them.
@@ -102,7 +132,7 @@ export async function analyzeImage(input: AnalyzeInput): Promise<ResultResponse>
   // 12. judge
   const medians = dimensionMedians(successful);
   const jref = judgeModel();
-  const judge = await runJudge(jref, llmImage, featuresText, analyzerOutcomes, medians);
+  const judge = await runJudge(jref, llmImage, featuresText, analyzerOutcomes, medians, deadline);
   await store.insertModelRun({
     submissionId: submission.id,
     stage: "judge",

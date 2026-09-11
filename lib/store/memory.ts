@@ -53,4 +53,16 @@ export class MemoryStore implements Store {
   async getFinalResult(submissionId: string): Promise<FinalResult | null> {
     return bag.finals.get(submissionId) ?? null;
   }
+
+  async deleteSubmission(id: string): Promise<void> {
+    bag.submissions.delete(id);
+    bag.runs.delete(id);
+    bag.finals.delete(id);
+  }
+
+  async countByObjectKey(objectKey: string): Promise<number> {
+    let n = 0;
+    for (const s of bag.submissions.values()) if (s.storageObjectKey === objectKey) n++;
+    return n;
+  }
 }

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 
 export const ALLOWED_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
 export type AllowedMime = (typeof ALLOWED_MIME_TYPES)[number];
@@ -81,7 +81,7 @@ export async function preprocessImage(input: Uint8Array): Promise<PreprocessedIm
     limitInputPixels: MAX_DIMENSION * MAX_DIMENSION,
     animated: false,
   });
-  let meta: sharp.Metadata;
+  let meta: Metadata;
   try {
     meta = await base.metadata();
   } catch {

@@ -12,9 +12,10 @@ export function isUuid(s: string): boolean {
 export function toResultResponse(submission: Submission, final: FinalResult, runs: ModelRun[]): ResultResponse {
   const analyzerRuns = runs.filter((r) => r.stage === "analyzer");
   const judgeRun = runs.find((r) => r.stage === "judge") ?? null;
-  const { storageObjectKey: _key, anonymousSessionId: _sid, ...publicSubmission } = submission;
+  const { storageObjectKey: _key, anonymousSessionId: _sid, originalFilename: _name, ...publicSubmission } = submission;
   void _key;
   void _sid;
+  void _name;
   return {
     submission: publicSubmission,
     final,

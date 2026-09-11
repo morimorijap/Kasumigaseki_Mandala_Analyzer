@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { RUBRIC_VERSION, rubricAsText } from "@/lib/scoring/rubric";
 
-export const PROMPT_VERSION = process.env.PROMPT_VERSION ?? "kasumigaseki-master-v1.1";
+export const PROMPT_VERSION = process.env.PROMPT_VERSION ?? "kasumigaseki-master-v1.2";
 
 const PROMPT_DIR = path.join(process.cwd(), "prompts");
 
@@ -34,18 +34,23 @@ export function buildAnalyzerPrompt(vars: { imageFeatures: string }): string {
   });
 }
 
-export function buildJudgePrompt(vars: {
-  imageFeatures: string;
-  analyzerResponses: string;
-  dimensionMedians: string;
-}): string {
+export function buildJudgePrompt(vars: { imageFeatures: string; dimensionMedians: string }): string {
   return fill(templates().judge, {
     kmi_rubric: rubricAsText(),
     rubric_version: RUBRIC_VERSION,
     image_features: vars.imageFeatures,
-    analyzer_responses: vars.analyzerResponses,
     dimension_medians: vars.dimensionMedians,
   });
+}
+
+/**
+ * Analyzer output goes in the user turn, wrapped in delimiters, so text that
+ * was transcribed from the image (untrusted) never sits inside the system
+ * prompt. Any literal closing tag inside the payload is neutralised.
+ */
+export function wrapUntrusted(tag: string, body: string): string {
+  const safe = body.replace(new RegExp(`</?${tag}>`, "gi"), `[${tag}]`);
+  return `<${tag}>\n${safe}\n</${tag}>`;
 }
 
 export function promptHash(text: string): string {

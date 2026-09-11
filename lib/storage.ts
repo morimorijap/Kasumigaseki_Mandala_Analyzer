@@ -13,6 +13,7 @@ export interface ObjectStorage {
   readonly kind: "s3" | "postgres" | "memory";
   put(key: string, data: Buffer, mime: string): Promise<void>;
   get(key: string): Promise<{ data: Buffer; mime: string } | null>;
+  delete(key: string): Promise<void>;
 }
 
 class MemoryStorage implements ObjectStorage {
@@ -26,6 +27,9 @@ class MemoryStorage implements ObjectStorage {
   }
   async get(key: string) {
     return MemoryStorage.bag().get(key) ?? null;
+  }
+  async delete(key: string) {
+    MemoryStorage.bag().delete(key);
   }
 }
 
@@ -49,6 +53,10 @@ class PostgresStorage implements ObjectStorage {
         ? Buffer.from(raw.replace(/^\\x/, ""), "hex")
         : Buffer.from(raw as Uint8Array);
     return { data, mime: String(rows[0].mime_type) };
+  }
+  async delete(key: string) {
+    const sql = getSql();
+    await sql`delete from image_blobs where object_key = ${key}`;
   }
 }
 
@@ -87,6 +95,10 @@ class S3Storage implements ObjectStorage {
       if ((err as { name?: string }).name === "NoSuchKey") return null;
       throw err;
     }
+  }
+  async delete(key: string) {
+    const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+    await (await this.s3()).send(new DeleteObjectCommand({ Bucket: this.cfg.bucket, Key: key }));
   }
 }
 

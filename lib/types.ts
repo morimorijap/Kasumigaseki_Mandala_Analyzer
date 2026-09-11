@@ -74,7 +74,7 @@ export type AnalyzerRun = {
 
 /** What GET /api/results/:id returns (never the image itself). */
 export type ResultResponse = {
-  submission: Omit<Submission, "storageObjectKey" | "anonymousSessionId">;
+  submission: Omit<Submission, "storageObjectKey" | "anonymousSessionId" | "originalFilename">;
   final: FinalResult;
   analyzers: AnalyzerRun[];
   judge: { provider: string; model: string; error: string | null; latencyMs: number } | null;

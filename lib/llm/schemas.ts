@@ -5,11 +5,15 @@ import { DIMENSION_KEYS } from "@/lib/scoring/rubric";
 const num01 = z.coerce.number().min(0).max(1);
 const num05 = z.coerce.number().min(0).max(5);
 const num0100 = z.coerce.number().min(0).max(100);
-const strList = (max: number) => z.array(z.string()).max(max).catch([]);
+/** LLM-provided free text: bounded so a hostile image cannot inflate storage or the page. */
+const SHORT = 400;
+const LONG = 2000;
+const shortStr = z.string().max(SHORT).catch((ctx) => String(ctx.input ?? "").slice(0, SHORT));
+const strList = (max: number) => z.array(shortStr).max(max).catch([]);
 
 export const DimensionScoreSchema = z.object({
   score: num05,
-  evidence: z.array(z.string()).min(1).max(3),
+  evidence: z.array(shortStr).min(1).max(3),
   confidence: num01.catch(0.5),
 });
 export type DimensionScore = z.infer<typeof DimensionScoreSchema>;
@@ -23,9 +27,9 @@ export const MandalaClassificationSchema = z.enum([
 
 export const AnalyzerResultSchema = z.object({
   observation: z.object({
-    centralConcept: z.string().nullable().catch(null),
+    centralConcept: shortStr.nullable().catch(null),
     majorRegions: strList(20),
-    layoutSummary: z.string().catch(""),
+    layoutSummary: z.string().max(LONG).catch((ctx) => String(ctx.input ?? "").slice(0, LONG)),
     unreadableAreas: strList(50),
   }),
 
@@ -40,7 +44,7 @@ export const AnalyzerResultSchema = z.object({
     taizokai: num0100,
     kongokai: num0100,
     classification: MandalaClassificationSchema.catch("neither"),
-    evidence: z.array(z.string()).min(1).max(6),
+    evidence: z.array(shortStr).min(1).max(6),
   }),
 
   readability: z.object({
@@ -59,7 +63,7 @@ export const AnalyzerResultSchema = z.object({
 export type AnalyzerResult = z.infer<typeof AnalyzerResultSchema>;
 
 export const AnalyzerEvaluationSchema = z.object({
-  name: z.string(),
+  name: shortStr,
   image_fidelity: num05.catch(0),
   structure_accuracy: num05.catch(0),
   mandala_mapping: num05.catch(0),
@@ -72,7 +76,7 @@ export const AnalyzerEvaluationSchema = z.object({
 
 export const DimensionAdjustmentSchema = z.object({
   adjustment: z.coerce.number().min(-1).max(1).catch(0),
-  reason: z.string().catch(""),
+  reason: shortStr.catch(""),
 });
 
 export const JudgeResultSchema = z.object({
@@ -80,7 +84,7 @@ export const JudgeResultSchema = z.object({
   dimension_adjustments: z
     .partialRecord(z.enum(DIMENSION_KEYS), DimensionAdjustmentSchema)
     .catch({}),
-  preferred_analysis: z.string().catch(""),
+  preferred_analysis: shortStr.catch(""),
   final_synthesis_notes: strList(20),
   /** Optional one-line verdict in the "霞ヶ関マスター" voice. */
   headline: z.string().max(200).optional().catch(undefined),

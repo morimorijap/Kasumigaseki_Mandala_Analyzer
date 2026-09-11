@@ -22,14 +22,31 @@ export type VisionResponse = {
   latencyMs: number;
 };
 
+export type LlmErrorCode = "config" | "http" | "timeout" | "network" | "empty";
+
+/**
+ * Error surfaced to callers (and ultimately persisted / returned to the
+ * browser). Messages are deliberately generic: provider response bodies can
+ * contain partial API keys or org ids, so those only go to the server log.
+ */
 export class LlmError extends Error {
   constructor(
-    message: string,
+    public readonly code: LlmErrorCode,
     public readonly provider: string,
     public readonly model: string,
     public readonly status?: number,
   ) {
-    super(message);
+    super(
+      code === "http"
+        ? `${provider}/${model}: upstream HTTP ${status}`
+        : code === "timeout"
+          ? `${provider}/${model}: timed out`
+          : code === "config"
+            ? `${provider}/${model}: provider not configured`
+            : code === "empty"
+              ? `${provider}/${model}: empty response`
+              : `${provider}/${model}: network error`,
+    );
     this.name = "LlmError";
   }
 }
@@ -46,8 +63,15 @@ export function parseModelList(list: string | undefined, fallback: string[]): Mo
   return src.map((s) => s.trim()).filter(Boolean).map(parseModelRef);
 }
 
-const DEFAULT_TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS ?? 180_000);
-const DEFAULT_MAX_OUTPUT_TOKENS = Number(process.env.LLM_MAX_OUTPUT_TOKENS ?? 6000);
+const DEFAULT_TIMEOUT_MS = (() => {
+  const v = Number(process.env.LLM_TIMEOUT_MS);
+  return Number.isFinite(v) && v > 0 ? v : 120_000;
+})();
+const DEFAULT_MAX_OUTPUT_TOKENS = (() => {
+  const v = Number(process.env.LLM_MAX_OUTPUT_TOKENS);
+  return Number.isFinite(v) && v > 0 ? v : 6000;
+})();
+export { DEFAULT_TIMEOUT_MS };
 
 export async function callVision(ref: ModelRef, req: VisionRequest): Promise<VisionResponse> {
   const started = Date.now();
@@ -87,7 +111,8 @@ export async function callVision(ref: ModelRef, req: VisionRequest): Promise<Vis
       out = await callAnthropic(ref, req, { maxTokens, timeoutMs });
       break;
     default:
-      throw new LlmError(`Unknown provider "${ref.provider}"`, ref.provider, ref.model);
+      console.error(`[llm] unknown provider "${ref.provider}"`);
+      throw new LlmError("config", ref.provider, ref.model);
   }
   return { ...out, latencyMs: Date.now() - started };
 }
@@ -104,22 +129,16 @@ async function fetchJson(
     const res = await fetch(url, { ...init, signal: ctrl.signal });
     const text = await res.text();
     if (!res.ok) {
-      throw new LlmError(
-        `${ref.provider}/${ref.model} HTTP ${res.status}: ${text.slice(0, 500)}`,
-        ref.provider,
-        ref.model,
-        res.status,
-      );
+      // Server log only — never persisted or returned.
+      console.error(`[llm] ${ref.provider}/${ref.model} HTTP ${res.status}: ${text.slice(0, 500)}`);
+      throw new LlmError("http", ref.provider, ref.model, res.status);
     }
     return JSON.parse(text) as Record<string, unknown>;
   } catch (err) {
     if (err instanceof LlmError) throw err;
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new LlmError(
-      ctrl.signal.aborted ? `${ref.provider}/${ref.model} timed out after ${timeoutMs}ms` : msg,
-      ref.provider,
-      ref.model,
-    );
+    if (ctrl.signal.aborted) throw new LlmError("timeout", ref.provider, ref.model);
+    console.error(`[llm] ${ref.provider}/${ref.model} request failed:`, err instanceof Error ? err.message : err);
+    throw new LlmError("network", ref.provider, ref.model);
   } finally {
     clearTimeout(timer);
   }
@@ -135,8 +154,10 @@ async function callOpenAiCompatible(
   req: VisionRequest,
   cfg: { baseUrl?: string; apiKey?: string; keyName: string; maxTokens: number; timeoutMs: number },
 ): Promise<{ text: string; usage: unknown }> {
-  if (!cfg.baseUrl) throw new LlmError(`Base URL not configured for provider ${ref.provider}`, ref.provider, ref.model);
-  if (!cfg.apiKey) throw new LlmError(`${cfg.keyName} is not set`, ref.provider, ref.model);
+  if (!cfg.baseUrl || !cfg.apiKey) {
+    console.error(`[llm] provider ${ref.provider} not configured (${cfg.keyName} / base URL)`);
+    throw new LlmError("config", ref.provider, ref.model);
+  }
 
   const dataUrl = `data:${req.image.mime};base64,${req.image.data.toString("base64")}`;
   const body: Record<string, unknown> = {
@@ -180,7 +201,7 @@ async function callOpenAiCompatible(
       : Array.isArray(content)
         ? content.map((c) => c.text ?? "").join("")
         : "";
-  if (!text) throw new LlmError(`${ref.provider}/${ref.model} returned empty content`, ref.provider, ref.model);
+  if (!text) throw new LlmError("empty", ref.provider, ref.model);
   return { text, usage: json.usage ?? null };
 }
 
@@ -190,7 +211,10 @@ async function callAnthropic(
   cfg: { maxTokens: number; timeoutMs: number },
 ): Promise<{ text: string; usage: unknown }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new LlmError("ANTHROPIC_API_KEY is not set", ref.provider, ref.model);
+  if (!apiKey) {
+    console.error("[llm] ANTHROPIC_API_KEY is not set");
+    throw new LlmError("config", ref.provider, ref.model);
+  }
   const baseUrl = (process.env.ANTHROPIC_BASE_URL ?? "https://api.anthropic.com").replace(/\/$/, "");
 
   const json = await fetchJson(
@@ -227,6 +251,6 @@ async function callAnthropic(
   );
   const blocks = json.content as { type: string; text?: string }[] | undefined;
   const text = (blocks ?? []).filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
-  if (!text) throw new LlmError(`${ref.provider}/${ref.model} returned empty content`, ref.provider, ref.model);
+  if (!text) throw new LlmError("empty", ref.provider, ref.model);
   return { text: "{" + text, usage: json.usage ?? null };
 }

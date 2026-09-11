@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import sharp from "sharp";
+import sharp, { type OverlayOptions } from "sharp";
 import { preprocessImage, sniffMime, ImageValidationError } from "@/lib/image/preprocess";
 import { extractImageFeatures } from "@/lib/image/features";
 
@@ -10,7 +10,7 @@ async function blank(w: number, h: number, fmt: "png" | "jpeg" | "webp" = "png")
 
 /** White canvas with a 3×3 grid of dark boxes — a crude "kongokai" shape. */
 async function gridImage(): Promise<Buffer> {
-  const boxes: sharp.OverlayOptions[] = [];
+  const boxes: OverlayOptions[] = [];
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 3; c++) {
       boxes.push({

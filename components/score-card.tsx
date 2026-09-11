@@ -12,6 +12,7 @@ export function ScoreCard({ final, headline }: { final: FinalResult; headline: s
       </p>
       <p className="mt-2 text-2xl font-bold">{final.grade}</p>
       <p className="mx-auto mt-4 max-w-2xl text-balance text-muted">「{headline}」</p>
+      <p className="mt-1 text-xs text-muted">※ 短評・根拠は AI が生成した文章です</p>
       <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-border" aria-hidden>
         <div className="h-full bg-accent transition-all" style={{ width: `${kmi}%` }} />
       </div>

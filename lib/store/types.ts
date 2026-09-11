@@ -13,4 +13,8 @@ export interface Store {
   getSubmission(id: string): Promise<Submission | null>;
   getModelRuns(submissionId: string): Promise<ModelRun[]>;
   getFinalResult(submissionId: string): Promise<FinalResult | null>;
+  /** Removes a submission and (via cascade) its runs / final result. */
+  deleteSubmission(id: string): Promise<void>;
+  /** How many submissions reference a storage object (images are content-addressed). */
+  countByObjectKey(objectKey: string): Promise<number>;
 }

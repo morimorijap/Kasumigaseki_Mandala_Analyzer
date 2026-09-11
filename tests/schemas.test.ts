@@ -63,3 +63,15 @@ describe("extractJson", () => {
     expect(() => extractJson("nothing here")).toThrow();
   });
 });
+
+describe("length caps", () => {
+  it("truncates oversized LLM strings instead of failing", () => {
+    const long = "あ".repeat(5000);
+    const odd = structuredClone(validAnalyzer) as Record<string, unknown>;
+    (odd.observation as Record<string, unknown>).layoutSummary = long;
+    (odd.dimensions as Record<string, { evidence: unknown }>).centrality.evidence = [long];
+    const parsed = AnalyzerResultSchema.parse(odd);
+    expect(parsed.observation.layoutSummary.length).toBe(2000);
+    expect(parsed.dimensions.centrality.evidence[0].length).toBe(400);
+  });
+});
