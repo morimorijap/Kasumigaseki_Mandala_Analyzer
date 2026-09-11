@@ -3,13 +3,11 @@
 ## Reporting a Vulnerability
 
 If you find a security vulnerability in this project, please report it
-**privately** via one of the following channels:
+**privately** via GitHub:
 
-1. **Preferred — GitHub Security Advisory**: open a private advisory on
+1. **GitHub Security Advisory**: open a private advisory on
    this repository (Security tab → "Report a vulnerability"). Replies
    stay private until you and the maintainers agree to publish.
-2. **Email**: `<security@your-domain.example>` _(replace with this
-   project's actual contact before publishing the repo)_.
 
 Please do **not** open a public GitHub issue for unpatched
 vulnerabilities — issue content is world-readable and indexed.

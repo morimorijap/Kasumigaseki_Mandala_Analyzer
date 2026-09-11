@@ -194,3 +194,7 @@ KMI v1 は「真の尺度」ではなく設計尺度です。人手ラベル付�
 - 東京国立博物館「空海と密教美術展」 https://www.tnm.jp/modules/r_free_page/index.php?id=1411
 - 文春オンライン「“霞が関曼荼羅”の伝統はいつまで続く？」 https://bunshun.jp/articles/-/47485
 - LLMcomp https://github.com/morimorijap/LLMcomp
+
+## ライセンス
+
+[MIT License](LICENSE)
